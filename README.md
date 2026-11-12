@@ -45,7 +45,7 @@ Every error response is JSON: `{"error": ["message", ...]}`.
 
 ### Auth
 
-Every API surface shares one bearer-token model: `Authorization: Bearer <token>`. There are no scopes; any valid token can ingest, query, and manage profiles. A token has an optional home org, used to scope requests that don't carry an org of their own (notably InSpec compliance reports, which Chef Automate's own wire format doesn't org-scope at all). Manage tokens with:
+Every API surface shares one bearer-token model, but accepts it over two different header names depending on the caller: the query API and profile store (cinc-dashboard's own client) use `Authorization: Bearer <token>`; the ingest endpoint also accepts `X-Data-Collector-Token: <token>`, since neither of its real callers -- chef-client's `data_collector` handler (reaching this endpoint via cinc-server-ng's reverse proxy, which injects this header) nor InSpec's own `automate` reporter (which sends it directly) -- can be reconfigured to send `Authorization: Bearer` instead. There are no scopes; any valid token can ingest, query, and manage profiles. A token has an optional home org, used to scope requests that don't carry an org of their own (notably InSpec compliance reports, which Chef Automate's own wire format doesn't org-scope at all). Manage tokens with:
 
 ```sh
 cinc-collector token create -name <name> -org <org>

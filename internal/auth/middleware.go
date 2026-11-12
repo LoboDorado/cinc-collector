@@ -49,7 +49,7 @@ func (m *Middleware) Require(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
-			writeAuthError(w, http.StatusUnauthorized, "missing or malformed Authorization header")
+			writeAuthError(w, http.StatusUnauthorized, "missing or malformed Authorization or X-Data-Collector-Token header")
 			return
 		}
 
@@ -68,16 +68,30 @@ func (m *Middleware) Require(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func bearerToken(r *http.Request) (string, bool) {
-	h := r.Header.Get("Authorization")
-	const prefix = "Bearer "
-	if !strings.HasPrefix(h, prefix) {
+	if h := r.Header.Get("Authorization"); h != "" {
+		const prefix = "Bearer "
+		if strings.HasPrefix(h, prefix) {
+			if token := strings.TrimSpace(h[len(prefix):]); token != "" {
+				return token, true
+			}
+		}
 		return "", false
 	}
-	token := strings.TrimSpace(h[len(prefix):])
-	if token == "" {
-		return "", false
+	// The ingest endpoint's real callers don't send Authorization: Bearer at
+	// all -- chef-client's data_collector handler reaches it only via
+	// cinc-server-ng's signed reverse proxy, which injects the token as
+	// X-Data-Collector-Token (mirroring Chef Infra Server's own
+	// data_collector['token'] forwarding), and InSpec's own automate
+	// reporter (lib/inspec/reporters/automate.rb's send_report) sets the
+	// same header directly, with no "Bearer " prefix. Neither tool can be
+	// reconfigured to send a different header, so this is the ingest
+	// endpoint's actual wire format, not a second scheme invented here --
+	// only the query API and profile store (cinc-dashboard's own client,
+	// which this project does control) use Authorization: Bearer.
+	if token := strings.TrimSpace(r.Header.Get("X-Data-Collector-Token")); token != "" {
+		return token, true
 	}
-	return token, true
+	return "", false
 }
 
 func writeAuthError(w http.ResponseWriter, status int, message string) {

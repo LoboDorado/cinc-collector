@@ -63,4 +63,32 @@ func TestMiddlewareRequire(t *testing.T) {
 			t.Errorf("status = %d, want 401", rec.Code)
 		}
 	})
+
+	// The ingest endpoint's real callers -- chef-client's data_collector
+	// handler (via cinc-server-ng's reverse proxy) and InSpec's own automate
+	// reporter -- send the token as X-Data-Collector-Token, not
+	// Authorization: Bearer. See bearerToken's comment.
+	t.Run("valid token via X-Data-Collector-Token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/data-collector/v0", nil)
+		req.Header.Set("X-Data-Collector-Token", token)
+		rec := httptest.NewRecorder()
+		handler(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("status = %d, want 200", rec.Code)
+		}
+		if sawOrg != "acme" {
+			t.Errorf("TokenOrg in handler = %q, want acme", sawOrg)
+		}
+	})
+
+	t.Run("Authorization takes precedence when both headers are set", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", "Bearer cinc_wrongvalue")
+		req.Header.Set("X-Data-Collector-Token", token)
+		rec := httptest.NewRecorder()
+		handler(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("status = %d, want 401 (a malformed Authorization header should not silently fall back)", rec.Code)
+		}
+	})
 }
