@@ -1,0 +1,59 @@
+# Local dev stack: SereneDB, a one-shot migration step, and the collector
+# itself. The `local` filesystem blob-storage backend (the dev default, see
+# internal/storage/local) needs no extra service, so there's no bundled
+# S3-compatible service here -- MinIO's Community Edition stopped publishing
+# usable public Docker images in 2026 (see docs/DEVELOPMENT.md). To exercise
+# the S3 backend locally, point -s3-endpoint at any S3-compatible service
+# you have available.
+services:
+  serenedb:
+    image: serenedb/serenedb
+    environment:
+      # Required to authenticate over a mapped TCP port rather than a
+      # loopback exec connection; local-exec connections don't need this.
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "7890:7890"
+    volumes:
+      - serenedb-data:/var/lib/serenedb
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-p", "7890", "-U", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Runs `cinc-collector migrate` once and exits. Migrations are a
+  # deliberate, explicit step (see CLAUDE.md) even here -- this container is
+  # the compose equivalent of the Kubernetes init-container pattern used in
+  # production, not an auto-migrate-on-boot shortcut.
+  migrate:
+    build:
+      context: ..
+    image: cinc-collector:dev
+    command: ["migrate"]
+    environment:
+      CINC_COLLECTOR_DB_DSN: postgres://postgres:postgres@serenedb:7890/postgres?sslmode=disable
+    depends_on:
+      serenedb:
+        condition: service_healthy
+
+  collector:
+    build:
+      context: ..
+    image: cinc-collector:dev
+    ports:
+      - "8891:8891"
+    environment:
+      CINC_COLLECTOR_DB_DSN: postgres://postgres:postgres@serenedb:7890/postgres?sslmode=disable
+      CINC_COLLECTOR_PROFILE_STORAGE_PATH: /data/profiles
+    volumes:
+      - collector-profiles:/data/profiles
+    depends_on:
+      serenedb:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  serenedb-data:
+  collector-profiles:

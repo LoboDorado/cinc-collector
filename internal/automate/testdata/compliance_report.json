@@ -1,0 +1,30 @@
+{
+  "type": "inspec_report",
+  "platform": {"name":"ubuntu","release":"24.04","target_id":"web01"},
+  "version": "6.0.0",
+  "end_time": "2026-11-10T12:05:00Z",
+  "node_uuid": "11111111-1111-1111-1111-111111111111",
+  "report_uuid": "33333333-3333-3333-3333-333333333333",
+  "node_name": "web01.example.com",
+  "environment": "production",
+  "statistics": {"duration": 12.5},
+  "profiles": [
+    {
+      "name": "ssh-hardening",
+      "sha256": "abc123",
+      "title": "SSH Hardening Baseline",
+      "controls": [
+        {
+          "id": "ssh-01",
+          "title": "Disable root login over SSH",
+          "desc": "Ensure PermitRootLogin is set to no",
+          "impact": 0.7,
+          "source_location": {"ref": "controls/ssh.rb", "line": 3},
+          "results": [
+            {"status": "failed", "code_desc": "SSH root login should be disabled", "run_time": 0.01, "start_time": "2026-11-10T12:04:59Z", "message": "expected PermitRootLogin to be no, got yes"}
+          ]
+        }
+      ]
+    }
+  ]
+}
