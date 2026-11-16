@@ -1,0 +1,42 @@
+cinc-collector {{ .Chart.AppVersion }} is deploying.
+
+{{- if .Values.ingress.enabled }}
+URL: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+The Service is {{ .Values.service.type }} on port {{ .Values.service.port }}.
+Port-forward to try it:
+
+  kubectl port-forward svc/{{ include "cinc-collector.fullname" . }} 8891:{{ .Values.service.port }}
+  curl http://localhost:8891/_status
+{{- end }}
+
+{{- if and (not .Values.existingSecret) (not .Values.dbDsn) }}
+
+WARNING: no dbDsn was provided. Set dbDsn (a SereneDB/Postgres connection
+string) or point existingSecret at a Secret that contains
+CINC_COLLECTOR_DB_DSN.
+{{- end }}
+
+Before the first replica starts serving, apply the schema once (migrations
+do NOT run automatically on boot -- letting replicas race to migrate
+concurrently is unsafe):
+
+  cinc-collector migrate -db-dsn "$DSN"
+
+Mint a bearer token for anything that needs to call this Collector (ingest,
+query, or the profile store all share one token model):
+
+  cinc-collector token create -db-dsn "$DSN" -name <name> -org <org>
+
+{{- if eq .Values.profileStorage "local" }}
+
+NOTE: profileStorage is "local" -- InSpec profile tarballs are stored on an
+emptyDir, which is lost on pod restart or rescheduling. Set profileStorage
+to "s3" (and fill in the s3.* values) for anything you want to keep, and to
+keep this chart's pods genuinely stateless.
+{{- end }}
+
+{{- if and (eq .Values.profileStorage "s3") (not .Values.s3.bucket) }}
+
+WARNING: profileStorage is "s3" but s3.bucket is empty.
+{{- end }}

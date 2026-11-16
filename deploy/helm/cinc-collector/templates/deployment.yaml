@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cinc-collector.fullname" . }}
+  labels:
+    {{- include "cinc-collector.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cinc-collector.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll pods when the non-secret config changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "cinc-collector.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+      containers:
+        - name: cinc-collector
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # "serve" is the image's own default CMD; Kubernetes' args here
+          # replaces CMD entirely, so it has to be repeated. The four flags
+          # below have no environment-variable form in the binary itself
+          # (see values.yaml), so they can't go through envFrom.
+          args:
+            - serve
+            - --db-max-conns={{ .Values.dbMaxConns | int }}
+            # `| int`: Helm decodes a bare YAML number as float64, and Go's
+            # default float formatting renders a value this size in
+            # scientific notation (6.7108864e+07) -- which flag.Int64 in the
+            # binary can't parse. `int` forces plain decimal rendering.
+            - --body-limit={{ .Values.bodyLimit | int }}
+            - --shutdown-delay={{ .Values.shutdownDelay }}
+            - --shutdown-timeout={{ .Values.shutdownTimeout }}
+          ports:
+            - name: http
+              containerPort: 8891
+          envFrom:
+            - configMapRef:
+                name: {{ include "cinc-collector.fullname" . }}
+            - secretRef:
+                name: {{ include "cinc-collector.secretName" . }}
+          readinessProbe:
+            httpGet:
+              path: /_status
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          {{- if eq .Values.profileStorage "local" }}
+          volumeMounts:
+            - name: profiles
+              mountPath: {{ .Values.profileStoragePath | default "/data/profiles" }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if eq .Values.profileStorage "local" }}
+      volumes:
+        # Non-persistent: profile tarballs stored this way are lost on pod
+        # restart/reschedule. Fine for a quick try; use profileStorage: s3
+        # for anything you want to keep, which is also the only way this
+        # chart's pods stay genuinely stateless.
+        - name: profiles
+          emptyDir:
+            sizeLimit: 2Gi
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
