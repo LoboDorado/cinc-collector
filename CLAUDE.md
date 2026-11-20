@@ -55,6 +55,13 @@ cinc-server-ng is explicitly single-process and non-HA (SQLite backend, auto-mig
 
 - **SereneDB's HA/clustering story is unproven.** Its README claims "high availability" but no HA/failover/clustering docs exist, and a line in it ("the complete single-node version is and always will be Apache 2.0") hints a multi-node capability may eventually be a paid tier. Run single-node for now; this needs to be re-resolved before any real production rollout. See `docs/specs/`.
 - **Backup/DR is more limited than plain Postgres**: no `pg_dump`, no WAL archiving, no point-in-time recovery. Only online file-copy backup and volume snapshots.
+- **No report retention/pruning exists.** Every ingested `converge_runs`/
+  `compliance_reports` row stays in SereneDB forever — confirmed by
+  grepping this codebase for retention/prune/TTL/cleanup logic; there is
+  none. Operators have to size SereneDB's storage for unbounded growth (see
+  `docs/DEPLOYMENT.md`'s "Database: SereneDB" section for the backup-story
+  limitations that compound this) or build pruning themselves. Tracked
+  deliberately as an open gap, not an oversight to silently work around.
 
 ## Testing
 

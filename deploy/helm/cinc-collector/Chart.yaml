@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cinc-collector
+description: Chef Automate-compatible data-collector backend for chef-client converge reports, InSpec compliance reports, and InSpec profile storage
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/cinc-project/cinc-collector
+sources:
+  - https://github.com/cinc-project/cinc-collector
+keywords:
+  - cinc
+  - chef
+  - inspec
+  - compliance

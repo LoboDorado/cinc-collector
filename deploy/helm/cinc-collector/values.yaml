@@ -1,0 +1,91 @@
+# Default values for cinc-collector.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/cinc-project/cinc-collector
+  tag: "" # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# -- SereneDB connection string (Postgres wire protocol) for the Collector's
+# own datastore (ingested runs/compliance reports, auth tokens) --
+# unrelated to cinc-dashboard's or cinc-server-ng's own databases. Commonly
+# carries embedded credentials, so it lives in the Secret, not the
+# ConfigMap. Apply the schema once before the first replica starts:
+#   cinc-collector migrate -db-dsn "$DSN"
+# (migrations do NOT run automatically on boot).
+dbDsn: "" # e.g. postgres://user:pass@serenedb-host:7890/postgres?sslmode=disable (REQUIRED unless existingSecret set)
+
+# -- Blob storage backend for InSpec profile tarballs: "local" or "s3".
+# "local" writes to an emptyDir (non-persistent across pod restarts/
+# rescheduling) unless you mount your own volume at profileStoragePath --
+# fine for a quick try, not for anything you want to keep. "s3" is the
+# only backend that keeps this chart's pods genuinely stateless.
+profileStorage: "local"
+# local backend only: directory to store profile tarballs in.
+profileStoragePath: "/data/profiles"
+
+# -- s3 backend only (profileStorage: s3). Works against AWS S3 or any
+# S3-compatible service (set s3.endpoint for the latter). Credentials come
+# from the AWS SDK's default credential chain (env vars, shared config, or
+# an IAM-equivalent role) -- there are no custom credential flags in this
+# chart or the binary; if your S3-compatible service needs static keys,
+# source AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY from existingSecret.
+s3:
+  bucket: ""
+  endpoint: "" # custom endpoint for a non-AWS S3-compatible service
+  region: "" # the AWS SDK requires a value even for an on-prem service;
+             # use whatever your S3-compatible service expects (e.g. us-east-1)
+
+# -- GET /_stats (Prometheus text exposition) HTTP Basic auth. Leave both
+# empty to accept the binary's own default behavior for an unset password.
+stats:
+  user: ""
+  password: "" # secret; set here or via existingSecret's CINC_COLLECTOR_STATS_PASSWORD
+
+# -- These four have no environment-variable form in the binary itself
+# (deliberately kept off ConfigMap/Secret-driven config) -- the chart passes
+# them as container args instead.
+dbMaxConns: 10
+bodyLimit: 67108864 # bytes; the binary's own default
+shutdownDelay: "0s" # how long to fail /_status before actually stopping, for
+                     # a load balancer to notice and drain traffic first
+shutdownTimeout: "30s" # how long in-flight requests get to finish after that
+
+# Use an externally-managed Secret instead of dbDsn/stats.password above.
+# Must contain CINC_COLLECTOR_DB_DSN, and optionally
+# CINC_COLLECTOR_STATS_PASSWORD and S3 credentials.
+existingSecret: ""
+
+service:
+  type: ClusterIP # ClusterIP, NodePort, LoadBalancer
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: cinc-collector.example.com
+  tls: [] # e.g. [{ secretName: cinc-collector-tls, hosts: [cinc-collector.example.com] }]
+
+# NetworkPolicy egress for the SereneDB port -- Postgres wire protocol.
+# SereneDB's own default is 7890, not Postgres's usual 5432 -- set this to
+# whatever port your SereneDB instance actually listens on.
+serenedbPort: 7890
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

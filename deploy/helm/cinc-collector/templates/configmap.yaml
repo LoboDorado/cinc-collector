@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cinc-collector.fullname" . }}
+  labels:
+    {{- include "cinc-collector.labels" . | nindent 4 }}
+data:
+  CINC_COLLECTOR_PROFILE_STORAGE: {{ .Values.profileStorage | default "local" | quote }}
+  {{- if eq .Values.profileStorage "local" }}
+  CINC_COLLECTOR_PROFILE_STORAGE_PATH: {{ .Values.profileStoragePath | default "/data/profiles" | quote }}
+  {{- end }}
+  {{- if eq .Values.profileStorage "s3" }}
+  CINC_COLLECTOR_S3_BUCKET: {{ required "s3.bucket is required when profileStorage=s3" .Values.s3.bucket | quote }}
+  {{- if .Values.s3.endpoint }}
+  CINC_COLLECTOR_S3_ENDPOINT: {{ .Values.s3.endpoint | quote }}
+  {{- end }}
+  {{- if .Values.s3.region }}
+  CINC_COLLECTOR_S3_REGION: {{ .Values.s3.region | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.stats.user }}
+  CINC_COLLECTOR_STATS_USER: {{ .Values.stats.user | quote }}
+  {{- end }}
