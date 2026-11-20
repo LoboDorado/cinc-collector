@@ -1,7 +1,7 @@
 # Minimal working configuration against S3-compatible storage.
 #   helm install cinc-collector ./deploy/helm/cinc-collector \
 #     -f values-example.yaml \
-#     --set dbDsn="postgres://user:password@serenedb.example.com:5432/postgres?sslmode=disable"
+#     --set dbDsn="postgres://user:password@serenedb.example.com:7890/postgres?sslmode=disable"
 
 profileStorage: s3
 s3:

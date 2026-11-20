@@ -18,7 +18,7 @@ fullnameOverride: ""
 # ConfigMap. Apply the schema once before the first replica starts:
 #   cinc-collector migrate -db-dsn "$DSN"
 # (migrations do NOT run automatically on boot).
-dbDsn: "" # e.g. postgres://user:pass@serenedb-host:5432/postgres?sslmode=disable (REQUIRED unless existingSecret set)
+dbDsn: "" # e.g. postgres://user:pass@serenedb-host:7890/postgres?sslmode=disable (REQUIRED unless existingSecret set)
 
 # -- Blob storage backend for InSpec profile tarballs: "local" or "s3".
 # "local" writes to an emptyDir (non-persistent across pod restarts/
@@ -72,10 +72,10 @@ ingress:
   host: cinc-collector.example.com
   tls: [] # e.g. [{ secretName: cinc-collector-tls, hosts: [cinc-collector.example.com] }]
 
-# NetworkPolicy egress for the SereneDB port -- Postgres wire protocol,
-# commonly 5432, but set this to whatever port your SereneDB instance
-# actually listens on.
-serenedbPort: 5432
+# NetworkPolicy egress for the SereneDB port -- Postgres wire protocol.
+# SereneDB's own default is 7890, not Postgres's usual 5432 -- set this to
+# whatever port your SereneDB instance actually listens on.
+serenedbPort: 7890
 
 resources:
   limits:
